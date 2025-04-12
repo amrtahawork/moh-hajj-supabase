@@ -9,8 +9,9 @@ import '../screens/comments_screen.dart';
 
 
 class HealthConditionsTab extends StatefulWidget {
-  const HealthConditionsTab({Key? key}) : super(key: key);
+  const HealthConditionsTab({super.key});
 
+ 
   @override
   State<HealthConditionsTab> createState() => _HealthConditionsTabState();
 }

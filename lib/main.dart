@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
         fontFamily: 'Roboto',
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16.0),
           ),
@@ -78,27 +78,42 @@ class _MainScreenState extends State<MainScreen> {
         items: <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: const Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
+            activeIcon: Icon(
+              Icons.person,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'My Profile',
           ),
           BottomNavigationBarItem(
-            icon:  Icon(Icons.medical_information_outlined),
-            activeIcon: Icon(Icons.medical_information, color: Theme.of(context).colorScheme.primary),
+            icon: Icon(Icons.medical_information_outlined),
+            activeIcon: Icon(
+              Icons.medical_information,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'My Medical Info',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.phone_outlined),
-            activeIcon: Icon(Icons.phone, color: Theme.of(context).colorScheme.primary),
+            activeIcon: Icon(
+              Icons.phone,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Important Numbers & Addresses',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.local_hospital_outlined),
-            activeIcon: Icon(Icons.local_hospital, color: Theme.of(context).colorScheme.primary),
+            activeIcon: Icon(
+              Icons.local_hospital,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'Health Conditions',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.newspaper_outlined),
-            activeIcon: Icon(Icons.newspaper, color: Theme.of(context).colorScheme.primary),
+            activeIcon: Icon(
+              Icons.newspaper,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             label: 'News',
           ),
         ],
