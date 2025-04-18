@@ -1,38 +1,38 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'screens/login_screen.dart';
+import 'tabs/home.dart';
+import 'tabs/my_medical_info.dart';
 import 'tabs/health_conditions.dart';
 import 'tabs/important_numbers_addresses.dart';
-import 'tabs/my_medical_info.dart';
-import 'tabs/my_profile.dart';
-import 'tabs/news.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'My Health App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.lightBlue,
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-        cardTheme: CardThemeData(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0),
-          ),
-          elevation: 2,
-        ),
-      ),
-      home: const MainScreen(),
+      title: 'Health Pass',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''), // English, no country code
+        Locale('ar', ''), // Arabic, no country code
+      ],
+      locale: const Locale('ar', ''),
+      home: const LoginScreen(),
     );
   }
 }
@@ -47,33 +47,29 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _tabs = [
-    const MyProfileTab(),
-    const MyMedicalInfoTab(),
-    const ImportantNumbersAddressesTab(),
-    const HealthConditionsTab(),
-    const NewsTab(),
-  ];
-
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
 
+  late final List<Widget> _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = [
+      Home(onTabChange: _onItemTapped),
+      const MyMedicalInfoTab(),
+      const HealthConditionsTab(),
+      const ImportantNumbersAddressesTab(),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Health'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: _tabs[_selectedIndex],
-      ),
+      body: SafeArea(child: _tabs[_selectedIndex]),
       bottomNavigationBar: BottomNavigationBar(
         items: <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -82,7 +78,7 @@ class _MainScreenState extends State<MainScreen> {
               Icons.person,
               color: Theme.of(context).colorScheme.primary,
             ),
-            label: 'My Profile',
+            label: 'الرئيسية',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.medical_information_outlined),
@@ -90,7 +86,7 @@ class _MainScreenState extends State<MainScreen> {
               Icons.medical_information,
               color: Theme.of(context).colorScheme.primary,
             ),
-            label: 'My Medical Info',
+            label: 'حالتي الصحية',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.phone_outlined),
@@ -98,7 +94,7 @@ class _MainScreenState extends State<MainScreen> {
               Icons.phone,
               color: Theme.of(context).colorScheme.primary,
             ),
-            label: 'Important Numbers & Addresses',
+            label: 'مدخلاتي الصحية',
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.local_hospital_outlined),
@@ -106,15 +102,7 @@ class _MainScreenState extends State<MainScreen> {
               Icons.local_hospital,
               color: Theme.of(context).colorScheme.primary,
             ),
-            label: 'Health Conditions',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.newspaper_outlined),
-            activeIcon: Icon(
-              Icons.newspaper,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            label: 'News',
+            label: 'ارقام مهمة ',
           ),
         ],
         currentIndex: _selectedIndex,

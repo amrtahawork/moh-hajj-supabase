@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="100" cy="100" r="95" fill="#fff" stroke="#007bff" stroke-width="4"/>
+  <path d="M100 30v140M30 100h140" stroke="#007bff" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="100" cy="100" r="35" fill="#007bff"/>
+  <text x="100" y="180" text-anchor="middle" font-family="Arial" font-size="14" fill="#007bff">وزارة الصحة المصرية</text>
+</svg>
