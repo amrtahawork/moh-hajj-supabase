@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../screens/health_pdfs_screen.dart';
-import '../screens/user_profile_screen.dart'; // Import the new screen
+import '../screens/user_profile_screen.dart'; 
 
 class Home extends StatelessWidget {
   final Function(int)? onTabChange;
@@ -14,12 +14,12 @@ class Home extends StatelessWidget {
     String qrData = "User Medical Data Placeholder";
 
     return Directionality(
-      textDirection: TextDirection.rtl, // Force RTL directionality
+      textDirection: TextDirection.rtl, 
       child: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Change to start for RTL
+            crossAxisAlignment: CrossAxisAlignment.start, 
             children: [
               const Padding(
                 padding: EdgeInsets.only(bottom: 16.0),
@@ -91,7 +91,7 @@ class Home extends StatelessWidget {
                     context,
                     color: Colors.green.shade100,
                     onTap: () {
-                      // Navigate to the new UserProfileScreen
+                      
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => const UserProfileScreen()),
@@ -213,7 +213,7 @@ class Home extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // Change to start for RTL
+                  crossAxisAlignment: CrossAxisAlignment.start, 
                   children: [
                     Text(
                       title,

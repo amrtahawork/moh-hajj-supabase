@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
 
 class AllergiesScreen extends StatefulWidget {
   const AllergiesScreen({super.key});
@@ -17,6 +18,92 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
   final TextEditingController _otherController = TextEditingController();
 
   final List<String> _selectedAllergies = [];
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAllergyData();
+  }
+
+  Future<void> _fetchAllergyData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final userId = _supabaseService.client.auth.currentUser?.id;
+    if (userId == null) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+    final data =
+        await _supabaseService.client
+            .from('allergies')
+            .select()
+            .eq('user_id', userId)
+            .maybeSingle();
+    if (data != null) {
+      setState(() {
+        _drugsAllergySelected = data['drugs_allergy'] ?? false;
+        _foodAllergySelected = data['food_allergy'] ?? false;
+        _otherAllergySelected = data['other_allergy'] ?? false;
+        _drugsController.text = data['drugs_details'] ?? '';
+        _foodController.text = data['food_details'] ?? '';
+        _otherController.text = data['other_details'] ?? '';
+        _selectedAllergies.clear();
+        if (data['selected_allergies'] != null) {
+          _selectedAllergies.addAll(
+            List<String>.from(data['selected_allergies']),
+          );
+        }
+      });
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveAllergyData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final userId = _supabaseService.client.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لم يتم العثور على المستخدم')),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+    final result = await _supabaseService.client.from('allergies').upsert({
+      'user_id': userId,
+      'drugs_allergy': _drugsAllergySelected,
+      'drugs_details': _drugsController.text,
+      'food_allergy': _foodAllergySelected,
+      'food_details': _foodController.text,
+      'other_allergy': _otherAllergySelected,
+      'other_details': _otherController.text,
+      'selected_allergies': _selectedAllergies,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    setState(() {
+      _isLoading = false;
+    });
+    if (result != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ بيانات الحساسية')));
+      Navigator.pop(context, _selectedAllergies);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تعذر حفظ بيانات الحساسية')));
+    }
+  }
 
   void _addAllergy(TextEditingController controller) {
     if (controller.text.isNotEmpty) {
@@ -46,17 +133,24 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
         backgroundColor: Colors.white,
         elevation: 1,
         shadowColor: Colors.grey.shade300,
-        iconTheme: const IconThemeData(color: Colors.black87), // Ensure back button is visible
+        iconTheme: const IconThemeData(
+          color: Colors.black87,
+        ), // Ensure back button is visible
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: ListView( // Use ListView for better scrolling with keyboard
+          child: ListView(
+            // Use ListView for better scrolling with keyboard
             children: [
               const Text(
                 'اختر أنواع الحساسية التي قد تكون لديك',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 16),
               _buildAllergyCategory(
@@ -66,7 +160,8 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
                 onChanged: (value) {
                   setState(() {
                     _drugsAllergySelected = value ?? false;
-                    if (!_drugsAllergySelected) _drugsController.clear(); // Clear text if unchecked
+                    if (!_drugsAllergySelected)
+                      _drugsController.clear(); // Clear text if unchecked
                   });
                 },
                 onAdd: () => _addAllergy(_drugsController),
@@ -80,7 +175,7 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
                 onChanged: (value) {
                   setState(() {
                     _foodAllergySelected = value ?? false;
-                     if (!_foodAllergySelected) _foodController.clear();
+                    if (!_foodAllergySelected) _foodController.clear();
                   });
                 },
                 onAdd: () => _addAllergy(_foodController),
@@ -94,7 +189,7 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
                 onChanged: (value) {
                   setState(() {
                     _otherAllergySelected = value ?? false;
-                     if (!_otherAllergySelected) _otherController.clear();
+                    if (!_otherAllergySelected) _otherController.clear();
                   });
                 },
                 onAdd: () => _addAllergy(_otherController),
@@ -105,54 +200,77 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
               const SizedBox(height: 16),
               const Text(
                 'الحساسية المختارة',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 8),
               _selectedAllergies.isEmpty
                   ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16.0),
-                      child: Text('لم يتم اختيار أي حساسية بعد.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                    )
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: Text(
+                      'لم يتم اختيار أي حساسية بعد.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
                   : Wrap(
-                      spacing: 8.0,
-                      runSpacing: 4.0,
-                      children: _selectedAllergies
-                          .map((allergy) => Chip(
-                                label: Text(allergy, style: TextStyle(color: Colors.pink.shade900)),
-                                deleteIcon: Icon(Icons.close, size: 18, color: Colors.pink.shade700),
+                    spacing: 8.0,
+                    runSpacing: 4.0,
+                    children:
+                        _selectedAllergies
+                            .map(
+                              (allergy) => Chip(
+                                label: Text(
+                                  allergy,
+                                  style: TextStyle(color: Colors.pink.shade900),
+                                ),
+                                deleteIcon: Icon(
+                                  Icons.close,
+                                  size: 18,
+                                  color: Colors.pink.shade700,
+                                ),
                                 onDeleted: () => _removeAllergy(allergy),
                                 backgroundColor: Colors.pink.shade50,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
-                                  side: BorderSide(color: Colors.pink.shade100)
+                                  side: BorderSide(color: Colors.pink.shade100),
                                 ),
-                              ))
-                          .toList(),
-                    ),
+                              ),
+                            )
+                            .toList(),
+                  ),
               const SizedBox(height: 32),
               Center(
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implement actual save logic (e.g., save to database/storage)
-                    print('Selected Allergies: $_selectedAllergies');
-                    print('Drugs Allergy Selected: $_drugsAllergySelected, Details: ${_drugsController.text}');
-                    print('Food Allergy Selected: $_foodAllergySelected, Details: ${_foodController.text}');
-                    print('Other Allergy Selected: $_otherAllergySelected, Details: ${_otherController.text}');
-                    Navigator.pop(context, _selectedAllergies); // Return the list of selected allergies
-                  },
+                  onPressed: _isLoading ? null : _saveAllergyData,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.pink, // Match image color
-                    padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 15),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 60,
+                      vertical: 15,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     elevation: 2,
                   ),
-                  child: const Text('حفظ', style: TextStyle(color: Colors.white)),
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                            'حفظ',
+                            style: TextStyle(color: Colors.white),
+                          ),
                 ),
               ),
-               const SizedBox(height: 20), // Add some padding at the bottom
+              const SizedBox(height: 20), // Add some padding at the bottom
             ],
           ),
         ),
@@ -169,23 +287,29 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
     required String hintText,
   }) {
     return Container(
-       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-       decoration: BoxDecoration(
-         color: Colors.white,
-         borderRadius: BorderRadius.circular(8),
-         boxShadow: [
-           BoxShadow(
-             color: Colors.grey.shade200,
-             blurRadius: 4,
-             offset: const Offset(0, 2),
-           )
-         ]
-       ),
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CheckboxListTile(
-            title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+            title: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
             value: isSelected,
             onChanged: onChanged,
             controlAffinity: ListTileControlAffinity.leading,
@@ -195,14 +319,21 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
           ),
           if (isSelected)
             Padding(
-              padding: const EdgeInsets.only(right: 40.0, left: 16.0, bottom: 8.0), // Indent text field aligned with checkbox text
+              padding: const EdgeInsets.only(
+                right: 40.0,
+                left: 16.0,
+                bottom: 8.0,
+              ), // Indent text field aligned with checkbox text
               child: TextField(
                 controller: controller,
                 decoration: InputDecoration(
                   hintText: hintText,
                   hintStyle: TextStyle(color: Colors.grey.shade500),
                   suffixIcon: IconButton(
-                    icon: Icon(Icons.add_circle_outline, color: Colors.pink.shade300),
+                    icon: Icon(
+                      Icons.add_circle_outline,
+                      color: Colors.pink.shade300,
+                    ),
                     onPressed: onAdd,
                     tooltip: 'إضافة',
                   ),
@@ -211,7 +342,7 @@ class _AllergiesScreenState extends State<AllergiesScreen> {
                     borderSide: BorderSide(color: Colors.pink.shade300),
                   ),
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8.0)
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8.0),
                 ),
                 onSubmitted: (_) => onAdd(), // Add on submit
               ),

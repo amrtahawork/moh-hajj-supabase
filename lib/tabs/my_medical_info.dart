@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hajj_health_pass/tabs/health_conditions.dart';
-import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-
+import '../services/health_data_service.dart';
 
 class MyMedicalInfoTab extends StatefulWidget {
   const MyMedicalInfoTab({super.key});
@@ -13,12 +9,15 @@ class MyMedicalInfoTab extends StatefulWidget {
 }
 
 class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
-  Map<String, dynamic> _medicalConditions = {};
-  List<String> _selectedConditionKeys = [];
-  String _otherConditionText = '';
+  final HealthDataService _service = HealthDataService();
+  List<String> _apiConditions = [];
+  List<String> _apiMedications = [];
+  List<String> _apiAllergies = [];
+  List<String> _apiOtherFactors = [];
+  String _apiComments = '';
   bool _isLoading = true;
 
-  // Added state for blood type selection
+  // Added state for blood type
   String? _selectedBloodType;
   String? _selectedRhFactor;
   final List<bool> _bloodTypeSelection = List.generate(4, (_) => false);
@@ -39,61 +38,56 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
   @override
   void initState() {
     super.initState();
-    _loadSelectedConditions();
-    _loadBloodType(); // Load saved blood type
+    _fetchAllMedicalInfo();
+    _loadBloodType();
   }
 
-  Future<void> _loadSelectedConditions() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    setState(() {}); // Refresh data when returning to this tab
+  }
+
+  Future<void> _fetchAllMedicalInfo() async {
+    setState(() => _isLoading = true);
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/medical_conditions.json');
-      if (await file.exists()) {
-        final jsonData = await file.readAsString();
-        final Map<String, dynamic> decodedData = jsonDecode(jsonData);
-        setState(() {
-          _medicalConditions = decodedData;
-          _selectedConditionKeys = _medicalConditions.keys
-              .where((key) => _medicalConditions[key] == true)
-              .toList();
-          _otherConditionText = _medicalConditions['otherConditionText'] ?? '';
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _medicalConditions = {};
-          _selectedConditionKeys = [];
-          _isLoading = false;
-        });
-        final jsonData = jsonEncode({});
-        await file.writeAsString(jsonData);
-      }
-    } catch (e) {
-      print('Error loading medical conditions: $e');
+      // Initialize the health data service which will load data from Supabase
+      await _service.init();
+      
       setState(() {
+        // Use data directly from the service which now comes from Supabase
+        _apiConditions = _service.conditions.keys.toList();
+        _apiMedications = _service.medications;
+        // Note: If allergies is not implemented in the service, this might need adjustment
+        _apiAllergies = [];
+        _apiOtherFactors = _service.otherFactors;
+        _apiComments = _service.comments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching medical info: $e');
+      setState(() {
+        _apiConditions = _service.conditions.keys.toList();
+        _apiMedications = _service.medications;
+        _apiAllergies = [];
+        _apiOtherFactors = _service.otherFactors;
+        _apiComments = _service.comments;
         _isLoading = false;
       });
     }
   }
 
-  // Added method to load saved blood type (example using shared_preferences, needs dependency)
-  // For simplicity, we'll just initialize it here. Add shared_preferences if persistence is needed.
+ 
   Future<void> _loadBloodType() async {
-    // Example: Load from storage if implemented
-    // SharedPreferences prefs = await SharedPreferences.getInstance();
-    // setState(() {
-    //   _selectedBloodType = prefs.getString('bloodType');
-    //   _selectedRhFactor = prefs.getString('rhFactor');
-    //   // Update selection arrays based on loaded values if needed
-    // });
+   
   }
 
   // Added method to save blood type (example using shared_preferences)
   Future<void> _saveBloodType() async {
-    // Example: Save to storage if implemented
-    // SharedPreferences prefs = await SharedPreferences.getInstance();
-    // await prefs.setString('bloodType', _selectedBloodType ?? '');
-    // await prefs.setString('rhFactor', _selectedRhFactor ?? '');
-    print('Saving Blood Type: $_selectedBloodType$_selectedRhFactor'); // Placeholder
+   
+    print(
+      'Saving Blood Type: $_selectedBloodType$_selectedRhFactor',
+    ); // Placeholder
   }
 
   // Copied and adapted from BloodTypeScreen
@@ -137,16 +131,27 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
                     isSelected: dialogBloodTypeSelection,
                     onPressed: (int index) {
                       setDialogState(() {
-                        for (int i = 0; i < dialogBloodTypeSelection.length; i++) {
+                        for (
+                          int i = 0;
+                          i < dialogBloodTypeSelection.length;
+                          i++
+                        ) {
                           dialogBloodTypeSelection[i] = i == index;
                         }
                         dialogSelectedBloodType = _bloodTypes[index];
                       });
                     },
-                    children: _bloodTypes.map((type) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(type),
-                    )).toList(),
+                    children:
+                        _bloodTypes
+                            .map(
+                              (type) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                ),
+                                child: Text(type),
+                              ),
+                            )
+                            .toList(),
                   ),
                   const SizedBox(height: 16),
                   const Text('اختر عامل Rh'), // Arabic text
@@ -155,16 +160,27 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
                     isSelected: dialogRhFactorSelection,
                     onPressed: (int index) {
                       setDialogState(() {
-                        for (int i = 0; i < dialogRhFactorSelection.length; i++) {
+                        for (
+                          int i = 0;
+                          i < dialogRhFactorSelection.length;
+                          i++
+                        ) {
                           dialogRhFactorSelection[i] = i == index;
                         }
                         dialogSelectedRhFactor = _rhFactors[index];
                       });
                     },
-                    children: _rhFactors.map((factor) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: Text(factor),
-                    )).toList(),
+                    children:
+                        _rhFactors
+                            .map(
+                              (factor) => Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                ),
+                                child: Text(factor),
+                              ),
+                            )
+                            .toList(),
                   ),
                 ],
               ),
@@ -175,7 +191,8 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (dialogSelectedBloodType != null && dialogSelectedRhFactor != null) {
+                    if (dialogSelectedBloodType != null &&
+                        dialogSelectedRhFactor != null) {
                       setState(() {
                         _selectedBloodType = dialogSelectedBloodType;
                         _selectedRhFactor = dialogSelectedRhFactor;
@@ -185,11 +202,17 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
                       _saveBloodType(); // Save the selection
                       Navigator.of(context).pop();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('تم حفظ فصيلة الدم: $_selectedBloodType$_selectedRhFactor')), // Arabic text
+                        SnackBar(
+                          content: Text(
+                            'تم حفظ فصيلة الدم: $_selectedBloodType$_selectedRhFactor',
+                          ),
+                        ), // Arabic text
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('الرجاء اختيار فصيلة الدم وعامل Rh')), // Arabic text
+                        const SnackBar(
+                          content: Text('الرجاء اختيار فصيلة الدم وعامل Rh'),
+                        ), // Arabic text
                       );
                     }
                   },
@@ -214,152 +237,77 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_selectedConditionKeys.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.medical_information_outlined,
-                size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'لا توجد معلومات طبية مسجلة',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HealthConditionsTab(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('إضافة معلومات طبية'),
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Theme.of(context).primaryColor,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Card(
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.medical_information,
-                              color: Colors.blue),
-                          const SizedBox(width: 8),
-                          Text(
-                            'المعلومات الطبية',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const Divider(),
-                      // Add Blood Type ListTile
-                      Card(
-                        color: Colors.pink.shade100, // Example color for blood type
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        child: ListTile(
-                          leading: const Icon(Icons.bloodtype, color: Colors.red),
-                          title: const Text(
-                            'فصيلة الدم', // Arabic text
-                            style: TextStyle(fontSize: 16),
-                          ),
-                          subtitle: Text(_selectedBloodType != null && _selectedRhFactor != null
-                              ? '$_selectedBloodType$_selectedRhFactor'
-                              : 'غير محدد'), // Show selected or 'Not set'
-                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                          onTap: _showBloodTypeDialog, // Call the dialog on tap
-                        ),
-                      ),
-                      // Existing conditions list
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _selectedConditionKeys.length,
-                        itemBuilder: (context, index) {
-                          final condition = _selectedConditionKeys[index];
-                          if (condition == 'otherConditionText') return Container();
-                          return Card(
-                            color: _getConditionColor(condition),
-                            margin: const EdgeInsets.symmetric(vertical: 4),
-                            child: ListTile(
-                              title: Text(
-                                condition,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                              trailing: const Icon(Icons.arrow_forward_ios,
-                                  size: 16),
-                              onTap: () {
-                                // Handle condition tap
-                              },
-                            ),
-                          );
-                        },
-                      ),
-                      if (_otherConditionText.isNotEmpty) ...[                        
-                        Card(
-                          color: _categoryColors['أخرى'],
-                          margin: const EdgeInsets.only(top: 8),
-                          child: ListTile(
-                            title: const Text('حالات أخرى'),
-                            subtitle: Text(_otherConditionText),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const HealthConditionsTab(),
+    return Scaffold(
+      appBar: AppBar(title: const Text('معلوماتي الطبية')),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Conditions
+                    Text(
+                      'الحالات الصحية:',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.edit),
-                label: const Text('تعديل المعلومات الطبية'),
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Theme.of(context).primaryColor,
-                  minimumSize: const Size(double.infinity, 48), // Make button wider
+                    const SizedBox(height: 8),
+                    if (_apiConditions.isEmpty)
+                      const Text('لا توجد حالات صحية مسجلة.'),
+                    ..._apiConditions.map((c) => ListTile(title: Text(c))),
+                    const Divider(),
+                    // Medications
+                    Text(
+                      'الأدوية:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_apiMedications.isEmpty)
+                      const Text('لا توجد أدوية مسجلة.'),
+                    ..._apiMedications.map((m) => ListTile(title: Text(m))),
+                    const Divider(),
+                    // Allergies
+                    Text(
+                      'الحساسية:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_apiAllergies.isEmpty)
+                      const Text('لا توجد حساسية مسجلة.'),
+                    ..._apiAllergies.map((a) => ListTile(title: Text(a))),
+                    const Divider(),
+                    // Other Factors
+                    Text(
+                      'عوامل أخرى:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_apiOtherFactors.isEmpty)
+                      const Text('لا توجد عوامل أخرى مسجلة.'),
+                    ..._apiOtherFactors.map((f) => ListTile(title: Text(f))),
+                    const Divider(),
+                    // Comments
+                    Text(
+                      'ملاحظات / تعليقات:',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (_apiComments.isEmpty)
+                      const Text('لا توجد ملاحظات أو تعليقات.'),
+                    if (_apiComments.isNotEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(_apiComments),
+                      ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,0 +1,2 @@
+C:/Users/Fujitsu/OneDrive/Desktop/flutter projects/hajjfinal/healthpass - supabase/android/app/.cxx/Debug/3x5y2u5b/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/Fujitsu/OneDrive/Desktop/flutter projects/hajjfinal/healthpass - supabase/android/app/.cxx/Debug/3x5y2u5b/armeabi-v7a/CMakeFiles/rebuild_cache.dir

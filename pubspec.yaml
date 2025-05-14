@@ -28,6 +28,9 @@ dependencies:
   mobile_scanner: ^3.4.1 # Replaced flutter_barcode_scanner
   flutter_svg: ^2.0.9 
   image_picker: ^1.1.2
+  http: ^1.2.1
+  # Supabase dependencies
+  supabase_flutter: ^2.3.4
 
 dev_dependencies:
   flutter_test:

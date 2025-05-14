@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart' show getApplicationDocumentsDirectory, getTemporaryDirectory;
+import '../services/health_data_service.dart';
 
 class OtherFactorsScreen extends StatefulWidget {
   const OtherFactorsScreen({super.key});
@@ -11,145 +9,92 @@ class OtherFactorsScreen extends StatefulWidget {
 }
 
 class _OtherFactorsScreenState extends State<OtherFactorsScreen> {
-  final Map<String, bool> _medicalProcedures = {
-    'تم حجزك في مستشفى': false,
-    'تم حجزك في رعاية مركزة': false,
-    'أجريت لك عملية جراحية': false,
-    'أجريت لك قسطرة قلبية أو مخية': false,
-    'أجريت لك جلسات غسيل كلوي': false,
-    'أجريت لك جلسات علاج كيماوي/إشعاعي': false,
-    'أجري لك منظار جهاز هضمي': false,
-    'أجري لك منظار آخر (أذكر نوعه)': false,
-    'تمت لك إجراءات أخرى (أذكرها)': false,
-  };
-
+  final List<String> _factors = [
+    'تم حجزك في مستشفى',
+    'تم حجزك في رعاية مركزة',
+    'أجريت لك عملية جراحية',
+    'أجريت لك قسطرة قلبية أو مخية',
+    'أجريت لك جلسات غسيل كلوي',
+    'أجريت لك جلسات علاج كيماوي/إشعاعي',
+    'أجري لك منظار جهاز هضمي',
+    'أجري لك منظار آخر (أذكر نوعه)',
+    'تمت لك إجراءات أخرى (أذكرها)',
+  ];
+  final HealthDataService _service = HealthDataService();
   final TextEditingController _detailsController = TextEditingController();
   bool _showDetailsField = false;
-
-  // Added missing map used in _buildCheckboxes
-  final Map<String, String> _procedureCategories = {
-    // Assign appropriate categories based on the procedures in _medicalProcedures
-    'تم حجزك في مستشفى': 'الإقامة بالمستشفى',
-    'تم حجزك في رعاية مركزة': 'الإقامة بالمستشفى',
-    'أجريت لك عملية جراحية': 'إجراءات جراحية',
-    'أجريت لك قسطرة قلبية أو مخية': 'إجراءات تدخلية',
-    'أجريت لك جلسات غسيل كلوي': 'علاجات مزمنة',
-    'أجريت لك جلسات علاج كيماوي/إشعاعي': 'علاجات مزمنة',
-    'أجري لك منظار جهاز هضمي': 'إجراءات تشخيصية',
-    'أجري لك منظار آخر (أذكر نوعه)': 'إجراءات تشخيصية',
-    'تمت لك إجراءات أخرى (أذكرها)': 'إجراءات أخرى',
-    // Note: The original failed search block contained keys not present in _medicalProcedures
-    // like 'التليف الكبدي', 'نزيف بالمخ / جلطة بالمخ', 'أنزيف من الفم'.
-    // These have been omitted here as they don't match the checkboxes being built.
-    // Adjust categories as needed for clinical accuracy.
-  };
+  String _savedDetails = '';
 
   @override
   void initState() {
     super.initState();
-    _loadSavedData();
+    _showDetailsField =
+        _service.otherFactors.contains('أجري لك منظار آخر (أذكر نوعه)') ||
+        _service.otherFactors.contains('تمت لك إجراءات أخرى (أذكرها)');
+    // Load saved details if any
+    _savedDetails =
+        _service.otherFactors.contains('details:')
+            ? _service.otherFactors
+                .firstWhere((f) => f.startsWith('details:'), orElse: () => '')
+                .replaceFirst('details:', '')
+            : '';
+    _detailsController.text = _savedDetails;
   }
 
-  Future<Directory?> _getStorageDirectory() async {
-    try {
-      return await getApplicationDocumentsDirectory();
-    } catch (e) {
-      print('خطأ في الوصول إلى مجلد التخزين: $e');
-      try {
-        return await getTemporaryDirectory();
-      } catch (e) {
-        print('خطأ في الوصول إلى المجلد المؤقت: $e');
-        return null;
-      }
-    }
+  @override
+  void dispose() {
+    _detailsController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadSavedData() async {
-    try {
-      final directory = await _getStorageDirectory();
-      if (directory == null) {
-        print('لم يتم العثور على مجلد للتخزين');
-        return;
+  void _onFactorChanged(String factor, bool value) {
+    setState(() {
+      if (value) {
+        _service.addOtherFactor(factor);
+      } else {
+        _service.removeOtherFactor(factor);
       }
-
-      final file = File('${directory.path}/medical_procedures.json');
-      if (await file.exists()) {
-        final jsonData = await file.readAsString();
-        final Map<String, dynamic> decodedData = jsonDecode(jsonData);
-        
-        setState(() {
-          for (var key in _medicalProcedures.keys) {
-            if (decodedData.containsKey(key)) {
-              _medicalProcedures[key] = decodedData[key] == true;
-            }
-          }
-          
-          if (decodedData.containsKey('details')) {
-            _detailsController.text = decodedData['details'];
-          }
-          
-          _updateDetailsFieldVisibility();
-        });
-      }
-    } catch (e) {
-      print('Error loading medical procedures: $e');
-    }
+      _showDetailsField =
+          _service.otherFactors.contains('أجري لك منظار آخر (أذكر نوعه)') ||
+          _service.otherFactors.contains('تمت لك إجراءات أخرى (أذكرها)');
+    });
   }
 
   Future<void> _saveData() async {
-    try {
-      final directory = await _getStorageDirectory();
-      if (directory == null) {
-        throw Exception('لم يتم العثور على مجلد للتخزين');
-      }
-
-      final Map<String, dynamic> dataToSave = {};
-      for (var entry in _medicalProcedures.entries) {
-        dataToSave[entry.key] = entry.value;
-      }
-      dataToSave['details'] = _detailsController.text;
-
-      final file = File('${directory.path}/medical_procedures.json');
-      await file.writeAsString(jsonEncode(dataToSave));
-
-      // Update medical conditions
-      final conditionsFile = File('${directory.path}/medical_conditions.json');
-      Map<String, dynamic> medicalConditions = {};
-      
-      if (await conditionsFile.exists()) {
-        final jsonData = await conditionsFile.readAsString();
-        medicalConditions = jsonDecode(jsonData);
-      }
-
-      for (var entry in _medicalProcedures.entries) {
-        if (entry.value) {
-          medicalConditions[entry.key] = true;
-        }
-      }
-
-      if (_detailsController.text.isNotEmpty && _showDetailsField) {
-        medicalConditions['otherConditionText'] = _detailsController.text;
-      }
-
-      await conditionsFile.writeAsString(jsonEncode(medicalConditions));
-      
+    // Save details locally as a special factor
+    if (_showDetailsField && _detailsController.text.trim().isNotEmpty) {
+      // Remove any previous details
+      _service.otherFactors.removeWhere((f) => f.startsWith('details:'));
+      _service.addOtherFactor('details:${_detailsController.text.trim()}');
+    } else {
+      _service.otherFactors.removeWhere((f) => f.startsWith('details:'));
+    }
+    setState(() {
+      _savedDetails = _detailsController.text.trim();
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('تم حفظ المعلومات محلياً')));
+    // Save to Supabase
+    final apiSuccess = await _service.saveUserData(
+      'other-factors',
+      {
+        'factors': _service.otherFactors
+            .where((f) => !f.startsWith('details:'))
+            .toList(),
+        if (_showDetailsField && _detailsController.text.trim().isNotEmpty)
+          'details': _detailsController.text.trim(),
+      },
+    );
+    if (apiSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ المعلومات بنجاح')),
+        const SnackBar(content: Text('تم حفظ المعلومات في Supabase')),
       );
-    } catch (e) {
-      print('Error saving medical data: $e');
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ أثناء حفظ المعلومات: ${e.toString()}')),
+        const SnackBar(content: Text('تعذر حفظ المعلومات في Supabase')),
       );
     }
-  }
-
-  void _updateDetailsFieldVisibility() {
-    setState(() {
-      // Only show details field if the specific 'other' checkboxes are checked
-      _showDetailsField = _medicalProcedures['أجري لك منظار آخر (أذكر نوعه)'] == true ||
-                          _medicalProcedures['تمت لك إجراءات أخرى (أذكرها)'] == true;
-    });
   }
 
   @override
@@ -181,8 +126,17 @@ class _OtherFactorsScreenState extends State<OtherFactorsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      ..._buildCheckboxes(),
-                      if (_showDetailsField) ...[  
+                      ..._factors.map(
+                        (factor) => CheckboxListTile(
+                          title: Text(factor),
+                          value: _service.otherFactors.contains(factor),
+                          onChanged:
+                              (val) => _onFactorChanged(factor, val ?? false),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          dense: true,
+                        ),
+                      ),
+                      if (_showDetailsField) ...[
                         const SizedBox(height: 16),
                         const Text('أدخل التفاصيل:'),
                         const SizedBox(height: 8),
@@ -215,22 +169,5 @@ class _OtherFactorsScreenState extends State<OtherFactorsScreen> {
         ),
       ),
     );
-  }
-
-  List<Widget> _buildCheckboxes() {
-    return _medicalProcedures.keys.map((procedure) {
-      return CheckboxListTile(
-        title: Text(procedure),
-        value: _medicalProcedures[procedure],
-        onChanged: (bool? value) {
-          setState(() {
-            _medicalProcedures[procedure] = value ?? false;
-            _updateDetailsFieldVisibility();
-          });
-        },
-        controlAffinity: ListTileControlAffinity.leading,
-        dense: true,
-      );
-    }).toList();
   }
 }

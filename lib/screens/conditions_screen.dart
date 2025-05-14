@@ -1,7 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+
+import '../services/supabase_service.dart';
 
 class ConditionsScreen extends StatefulWidget {
   const ConditionsScreen({super.key});
@@ -15,9 +14,9 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
     'الضغط',
     'السكر',
     'ضعف عضلة القلب',
-    'مراض الشريان التاجي (ذبحة صدرية بلطة بالقلب)',
+    'امراض الشريان التاجي (ذبحة صدرية جلطة بالقلب)',
     'التليف الكبدي',
-    'القصور ور الكلوي',
+    'القصور الكلوي',
     'أورام',
     'نزيف بالمخ / جلطة بالمخ',
     'شلل نصفي / شلل رباعي',
@@ -34,8 +33,11 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
   ];
 
   final Map<String, dynamic> _selectedConditions = {};
-  final TextEditingController _otherConditionController = TextEditingController();
+  final TextEditingController _otherConditionController =
+      TextEditingController();
   bool _showOtherTextField = false;
+  final SupabaseService _supabaseService = SupabaseService();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -44,12 +46,94 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
       _selectedConditions[condition] = false;
     }
     _selectedConditions['otherConditionText'] = '';
+    _fetchConditions();
   }
-  
+
   @override
   void dispose() {
     _otherConditionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchConditions() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final userId = _supabaseService.client.auth.currentUser?.id;
+    if (userId == null) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+    final data =
+        await _supabaseService.client
+            .from('conditions')
+            .select()
+            .eq('user_id', userId)
+            .maybeSingle();
+    if (data != null) {
+      setState(() {
+        for (var condition in _conditions) {
+          _selectedConditions[condition] = data[condition] ?? false;
+        }
+        _selectedConditions['otherConditionText'] =
+            data['otherConditionText'] ?? '';
+        _showOtherTextField = data['أمراض أخرى (أذكرها):'] ?? false;
+        _otherConditionController.text = data['otherConditionText'] ?? '';
+      });
+    }
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveConditions() async {
+    setState(() {
+      _isLoading = true;
+    });
+    final userId = _supabaseService.client.auth.currentUser?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لم يتم العثور على المستخدم')),
+      );
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+    Map<String, dynamic> conditionsData = {'user_id': userId};
+    for (var condition in _conditions) {
+      if (_selectedConditions[condition] == true) {
+        conditionsData[condition] = true;
+      } else {
+        conditionsData[condition] = false;
+      }
+    }
+    if (_selectedConditions['أمراض أخرى (أذكرها):'] == true &&
+        _selectedConditions['otherConditionText'].toString().isNotEmpty) {
+      conditionsData['otherConditionText'] =
+          _selectedConditions['otherConditionText'];
+    } else {
+      conditionsData['otherConditionText'] = '';
+    }
+    conditionsData['updated_at'] = DateTime.now().toIso8601String();
+    final result = await _supabaseService.client
+        .from('conditions')
+        .upsert(conditionsData);
+    setState(() {
+      _isLoading = false;
+    });
+    if (result != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم حفظ الحالات الصحية في Supabase')),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر حفظ الحالات الصحية في Supabase')),
+      );
+    }
   }
 
   @override
@@ -85,7 +169,8 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
                                 _showOtherTextField = value;
                                 if (!value) {
                                   _otherConditionController.clear();
-                                  _selectedConditions['otherConditionText'] = '';
+                                  _selectedConditions['otherConditionText'] =
+                                      '';
                                 }
                               }
                             });
@@ -95,9 +180,13 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        if (_showOtherTextField && condition == 'أمراض أخرى (أذكرها):')
+                        if (_showOtherTextField &&
+                            condition == 'أمراض أخرى (أذكرها):')
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 8.0,
+                            ),
                             child: TextField(
                               controller: _otherConditionController,
                               decoration: InputDecoration(
@@ -108,7 +197,8 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
                               ),
                               textDirection: TextDirection.rtl,
                               onChanged: (value) {
-                                _selectedConditions['otherConditionText'] = value;
+                                _selectedConditions['otherConditionText'] =
+                                    value;
                               },
                             ),
                           ),
@@ -119,38 +209,7 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () async {
-                  Map<String, dynamic> conditionsData = {};
-                  
-                  // Add selected conditions
-                  for (var condition in _conditions) {
-                    if (_selectedConditions[condition] == true) {
-                      conditionsData[condition] = true;
-                    }
-                  }
-                  
-                  // Add other condition text if applicable
-                  if (_selectedConditions['أمراض أخرى (أذكرها):'] == true && 
-                      _selectedConditions['otherConditionText'].toString().isNotEmpty) {
-                    conditionsData['otherConditionText'] = _selectedConditions['otherConditionText'];
-                  }
-                  
-                  final directory = await getApplicationDocumentsDirectory();
-                  final file = File('${directory.path}/medical_conditions.json');
-                  final data = jsonEncode(conditionsData);
-
-                  if (!await file.exists()) {
-                    await file.create();
-                  }
-
-                  await file.writeAsString(data);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم حفظ الحالات الصحية.')),
-                    );
-                    Navigator.pop(context);
-                  }
-                },
+                onPressed: _isLoading ? null : _saveConditions,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -159,11 +218,15 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
                   ),
                   minimumSize: const Size(double.infinity, 50),
                 ),
-                child: const Text('حفظ'),
-              ), // Added closing parenthesis here
-          ],
+                child:
+                    _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('حفظ'),
+              ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 }
