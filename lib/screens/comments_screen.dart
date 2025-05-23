@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/health_data_service.dart';
 import '../services/supabase_service.dart';
+import '../screens/login_screen.dart'; // Import for AppUser
 
 class CommentsScreen extends StatefulWidget {
   const CommentsScreen({super.key});
@@ -26,28 +27,45 @@ class _CommentsScreenState extends State<CommentsScreen> {
     setState(() {
       _isLoading = true;
     });
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
+
+    String? nationalId = AppUser.currentUserId;
+    print('Using nationalId for comment: $nationalId');
+    if (nationalId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')),
+        );
+      });
       setState(() {
         _isLoading = false;
       });
       return;
     }
-    final data =
-        await _supabaseService.client
-            .from('comments')
-            .select()
-            .eq('user_id', userId)
-            .maybeSingle();
-    if (data != null && data['comment'] != null) {
+
+    try {
+      final data =
+          await _supabaseService.client
+              .from('comments')
+              .select()
+              .eq('national_id', nationalId)
+              .maybeSingle();
+
+      if (data != null && data['comment'] != null) {
+        setState(() {
+          _controller.text = data['comment'];
+          _currentComment = data['comment'];
+        });
+      }
+    } catch (e) {
+      print('Error fetching comment: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('خطأ في تحميل البيانات: $e')));
+    } finally {
       setState(() {
-        _controller.text = data['comment'];
-        _currentComment = data['comment'];
+        _isLoading = false;
       });
     }
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
@@ -57,44 +75,67 @@ class _CommentsScreenState extends State<CommentsScreen> {
   }
 
   Future<void> _saveComment() async {
+    if (_controller.text == _currentComment) {
+      Navigator.pop(context);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لم يتم العثور على المستخدم')),
-      );
+
+    String? nationalId = AppUser.currentUserId;
+    print('Using nationalId for comment save: $nationalId');
+    if (nationalId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')),
+        );
+      });
       setState(() {
         _isLoading = false;
       });
       return;
     }
-    final text = _controller.text.trim();
-    final result = await _supabaseService.client.from('comments').upsert({
-      'user_id': userId,
-      'comment': text,
-      'updated_at': DateTime.now().toIso8601String(),
-    });
-    setState(() {
-      _isLoading = false;
-      _currentComment = text;
-    });
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ التعليق في Supabase')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر حفظ التعليق في Supabase')),
-      );
+
+    try {
+      await _supabaseService.client.from('comments').upsert({
+        'national_id': nationalId,
+        'comment': _controller.text,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ الملاحظات')));
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error saving comment: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر حفظ الملاحظات: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ملاحظات / تعليقات')),
+      appBar: AppBar(
+        title: const Text('الملاحظات'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36),
+          onPressed: () => Navigator.of(context).maybePop(),
+          color: Theme.of(context).colorScheme.onPrimary,
+          tooltip: 'رجوع',
+        ),
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Padding(

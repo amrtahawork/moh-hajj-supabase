@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/supabase_service.dart';
+import '../screens/login_screen.dart'; // Import for AppUser
 
 class ConditionsScreen extends StatefulWidget {
   const ConditionsScreen({super.key});
@@ -59,87 +60,164 @@ class _ConditionsScreenState extends State<ConditionsScreen> {
     setState(() {
       _isLoading = true;
     });
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
+
+    String? nationalId = AppUser.currentUserId;
+    print('Using nationalId for conditions fetch: $nationalId');
+    if (nationalId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')),
+        );
+      });
       setState(() {
         _isLoading = false;
       });
       return;
     }
-    final data =
-        await _supabaseService.client
-            .from('conditions')
-            .select()
-            .eq('user_id', userId)
-            .maybeSingle();
-    if (data != null) {
+
+    try {
+      final data =
+          await _supabaseService.client
+              .from('conditions')
+              .select()
+              .eq('national_id', nationalId)
+              .maybeSingle();
+
+      if (data != null) {
+        setState(() {
+          // Map each column to the UI state
+          _selectedConditions['الضغط'] = data['hypertension'] ?? false;
+          _selectedConditions['السكر'] = data['diabetes'] ?? false;
+          _selectedConditions['ضعف عضلة القلب'] =
+              data['heart_failure'] ?? false;
+          _selectedConditions['امراض الشريان التاجي (ذبحة صدرية جلطة بالقلب)'] =
+              data['coronary_artery_disease'] ?? false;
+          _selectedConditions['التليف الكبدي'] =
+              data['liver_fibrosis'] ?? false;
+          _selectedConditions['القصور الكلوي'] = data['renal_failure'] ?? false;
+          _selectedConditions['أورام'] = data['tumors'] ?? false;
+          _selectedConditions['نزيف بالمخ / جلطة بالمخ'] =
+              data['brain_bleed'] ?? false;
+          _selectedConditions['شلل نصفي / شلل رباعي'] =
+              data['hemiplegia'] ?? false;
+          _selectedConditions['أمراض عصبية أو نفسية'] =
+              data['neuro_psych'] ?? false;
+          _selectedConditions['نزيف من الفم'] = data['mouth_bleed'] ?? false;
+          _selectedConditions['نزيف من فتحة الشرج'] =
+              data['rectal_bleed'] ?? false;
+          _selectedConditions['فرحة بالمعدة أو الإثنا عشر'] =
+              data['stomach_ulcer'] ?? false;
+          _selectedConditions['حساسية الصدر (الربو)'] = data['asthma'] ?? false;
+          _selectedConditions['درن (سل)'] = data['tuberculosis'] ?? false;
+          _selectedConditions['تليف بالرئة'] = data['lung_fibrosis'] ?? false;
+          _selectedConditions['أمراض مناعية'] = data['autoimmune'] ?? false;
+          _selectedConditions['أمراض دم مزمنة'] =
+              data['chronic_blood_disease'] ?? false;
+          _selectedConditions['أمراض أخرى (أذكرها):'] =
+              (data['other_conditions'] != null &&
+                      data['other_conditions'] != '')
+                  ? true
+                  : false;
+          _selectedConditions['otherConditionText'] =
+              data['other_conditions'] ?? '';
+          _otherConditionController.text =
+              _selectedConditions['otherConditionText'];
+          _showOtherTextField =
+              _selectedConditions['أمراض أخرى (أذكرها):'] ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching conditions: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('خطأ في تحميل البيانات: $e')));
+    } finally {
       setState(() {
-        for (var condition in _conditions) {
-          _selectedConditions[condition] = data[condition] ?? false;
-        }
-        _selectedConditions['otherConditionText'] =
-            data['otherConditionText'] ?? '';
-        _showOtherTextField = data['أمراض أخرى (أذكرها):'] ?? false;
-        _otherConditionController.text = data['otherConditionText'] ?? '';
+        _isLoading = false;
       });
     }
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   Future<void> _saveConditions() async {
     setState(() {
       _isLoading = true;
     });
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لم يتم العثور على المستخدم')),
-      );
+
+    String? nationalId = AppUser.currentUserId;
+    print('Using nationalId for conditions save: $nationalId');
+    if (nationalId == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('الرجاء تسجيل الدخول أولاً')),
+        );
+      });
       setState(() {
         _isLoading = false;
       });
       return;
     }
-    Map<String, dynamic> conditionsData = {'user_id': userId};
-    for (var condition in _conditions) {
-      if (_selectedConditions[condition] == true) {
-        conditionsData[condition] = true;
-      } else {
-        conditionsData[condition] = false;
-      }
-    }
-    if (_selectedConditions['أمراض أخرى (أذكرها):'] == true &&
-        _selectedConditions['otherConditionText'].toString().isNotEmpty) {
-      conditionsData['otherConditionText'] =
-          _selectedConditions['otherConditionText'];
-    } else {
-      conditionsData['otherConditionText'] = '';
-    }
-    conditionsData['updated_at'] = DateTime.now().toIso8601String();
-    final result = await _supabaseService.client
-        .from('conditions')
-        .upsert(conditionsData);
-    setState(() {
-      _isLoading = false;
-    });
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ الحالات الصحية في Supabase')),
-      );
+
+    try {
+      // Map UI state to DB columns
+      final data = {
+        'national_id': nationalId,
+        'hypertension': _selectedConditions['الضغط'] ?? false,
+        'diabetes': _selectedConditions['السكر'] ?? false,
+        'heart_failure': _selectedConditions['ضعف عضلة القلب'] ?? false,
+        'coronary_artery_disease':
+            _selectedConditions['امراض الشريان التاجي (ذبحة صدرية جلطة بالقلب)'] ??
+            false,
+        'liver_fibrosis': _selectedConditions['التليف الكبدي'] ?? false,
+        'renal_failure': _selectedConditions['القصور الكلوي'] ?? false,
+        'tumors': _selectedConditions['أورام'] ?? false,
+        'brain_bleed': _selectedConditions['نزيف بالمخ / جلطة بالمخ'] ?? false,
+        'hemiplegia': _selectedConditions['شلل نصفي / شلل رباعي'] ?? false,
+        'neuro_psych': _selectedConditions['أمراض عصبية أو نفسية'] ?? false,
+        'mouth_bleed': _selectedConditions['نزيف من الفم'] ?? false,
+        'rectal_bleed': _selectedConditions['نزيف من فتحة الشرج'] ?? false,
+        'stomach_ulcer':
+            _selectedConditions['فرحة بالمعدة أو الإثنا عشر'] ?? false,
+        'asthma': _selectedConditions['حساسية الصدر (الربو)'] ?? false,
+        'tuberculosis': _selectedConditions['درن (سل)'] ?? false,
+        'lung_fibrosis': _selectedConditions['تليف بالرئة'] ?? false,
+        'autoimmune': _selectedConditions['أمراض مناعية'] ?? false,
+        'chronic_blood_disease': _selectedConditions['أمراض دم مزمنة'] ?? false,
+        'other_conditions': _selectedConditions['otherConditionText'] ?? '',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      await _supabaseService.client.from('conditions').upsert(data);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ الحالات المرضية')));
       Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر حفظ الحالات الصحية في Supabase')),
-      );
+    } catch (e) {
+      print('Error saving conditions: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('تعذر حفظ الحالات المرضية: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('الحالات الصحية')),
+      appBar: AppBar(
+        title: const Text('الحالات المرضية'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36),
+          onPressed: () => Navigator.of(context).maybePop(),
+          color: Theme.of(context).colorScheme.onPrimary,
+          tooltip: 'رجوع',
+        ),
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Padding(

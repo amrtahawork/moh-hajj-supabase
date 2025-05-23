@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/supabase_service.dart';
+import '../screens/login_screen.dart'; // Import for AppUser
 
 class MedicationScreen extends StatefulWidget {
   const MedicationScreen({super.key});
@@ -30,63 +31,188 @@ class _MedicationScreenState extends State<MedicationScreen> {
     setState(() {
       _isLoading = true;
     });
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
+
+    String? nationalId = AppUser.currentUserId;
+    if (nationalId == null) {
       setState(() {
         _isLoading = false;
       });
       return;
     }
-    final data = await _supabaseService.client
-        .from('medications')
-        .select()
-        .eq('user_id', userId);
-    setState(() {
-      _medications =
-          data != null
-              ? List<String>.from(
-                data.map((item) => item['medication'] as String),
-              )
-              : [];
-      _isLoading = false;
-    });
+
+    try {
+      final data =
+          await _supabaseService.client
+              .from('medications')
+              .select('medication')
+              .eq('national_id', nationalId)
+              .maybeSingle();
+
+      if (data != null &&
+          data['medication'] != null &&
+          data['medication'].toString().isNotEmpty) {
+        setState(() {
+          _medications =
+              data['medication']
+                  .toString()
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+        });
+      } else {
+        setState(() {
+          _medications = [];
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _medications = [];
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _addMedication() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    setState(() => _isLoading = true);
-    final userId = _supabaseService.client.auth.currentUser?.id;
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لم يتم العثور على المستخدم')),
-      );
-      setState(() => _isLoading = false);
+    if (_controller.text.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    String? nationalId = AppUser.currentUserId;
+    if (nationalId == null) {
+      setState(() {
+        _isLoading = false;
+      });
       return;
     }
-    final result = await _supabaseService.client.from('medications').insert({
-      'user_id': userId,
-      'medication': text,
-      'created_at': DateTime.now().toIso8601String(),
+
+    try {
+      final data =
+          await _supabaseService.client
+              .from('medications')
+              .select('medication')
+              .eq('national_id', nationalId)
+              .maybeSingle();
+
+      String newMed = _controller.text.trim();
+      List<String> meds = [];
+      if (data != null &&
+          data['medication'] != null &&
+          data['medication'].toString().isNotEmpty) {
+        meds =
+            data['medication']
+                .toString()
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+      }
+      meds.add(newMed);
+
+      String updatedMedications = meds.join(',');
+
+      await _supabaseService.client.from('medications').upsert({
+        'national_id': nationalId,
+        'medication': updatedMedications,
+      });
+
+      setState(() {
+        _medications = meds;
+        _controller.clear();
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم إضافة الدواء')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _deleteMedication(String medication) async {
+    setState(() {
+      _isLoading = true;
     });
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم حفظ الدواء في Supabase')),
-      );
-      _controller.clear();
-      await _fetchMedications();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر حفظ الدواء في Supabase')),
-      );
-      setState(() => _isLoading = false);
+
+    String? nationalId = AppUser.currentUserId;
+    if (nationalId == null) {
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final data =
+          await _supabaseService.client
+              .from('medications')
+              .select('medication')
+              .eq('national_id', nationalId)
+              .maybeSingle();
+
+      List<String> meds = [];
+      if (data != null &&
+          data['medication'] != null &&
+          data['medication'].toString().isNotEmpty) {
+        meds =
+            data['medication']
+                .toString()
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+      }
+      meds.remove(medication);
+
+      String updatedMedications = meds.join(',');
+
+      await _supabaseService.client.from('medications').upsert({
+        'national_id': nationalId,
+        'medication': updatedMedications,
+      });
+
+      setState(() {
+        _medications = meds;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم حذف الدواء')));
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء الحذف: $e')));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('الأدوية')),
+      appBar: AppBar(
+        title: const Text('الأدوية'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36),
+          onPressed: () => Navigator.of(context).maybePop(),
+          color: Theme.of(context).colorScheme.onPrimary,
+          tooltip: 'رجوع',
+        ),
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Padding(
@@ -147,6 +273,16 @@ class _MedicationScreenState extends State<MedicationScreen> {
                             return ListTile(
                               title: Text(med),
                               leading: const Icon(Icons.medication_outlined),
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed:
+                                    _isLoading
+                                        ? null
+                                        : () => _deleteMedication(med),
+                              ),
                             );
                           },
                         ),

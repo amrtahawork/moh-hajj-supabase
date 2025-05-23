@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
-import '../services/supabase_service.dart';
+
+// Add a simple static holder for the current user ID and profile
+class AppUser {
+  static String? currentUserId;
+  static Map<String, dynamic>? profile;
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,17 +16,32 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _barcodeController = TextEditingController();
-  final SupabaseService _supabaseService = SupabaseService();
+  // final TextEditingController _barcodeController = TextEditingController(); // Remove controller
   bool _isLoading = false;
+  String _loginValue = '';
 
-  Future<void> _validateAndNavigate(String value) async {
+  Future<void> _validateAndNavigate(String identifier) async {
     setState(() {
       _isLoading = true;
     });
     try {
-      final user = await _supabaseService.fetchUserByIdOrPassport(value);
-      if (user != null) {
+      final response =
+          await Supabase.instance.client
+              .from('user_profile')
+              .select()
+              .or('national_id.eq.$identifier,passport_number.eq.$identifier')
+              .maybeSingle();
+
+      if (response != null) {
+        // Debug print the full response
+        print('Supabase user_profile response: $response');
+        // Store the authenticated user's information
+        AppUser.currentUserId = response['national_id'];
+        AppUser.profile = response;
+        print(
+          'Logged in userId (should be UUID): \\${AppUser.currentUserId}',
+        ); // Debug print
+
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const MainScreen()),
           (Route<dynamic> route) => false,
@@ -53,12 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.local_hospital, size: 150, color: Colors.blue),
+            Image.asset('assets/images/moh_egy.png', width: 150, height: 150),
             const SizedBox(height: 40),
             TextField(
-              controller: _barcodeController,
+              // controller: _barcodeController, // Remove controller
+              onChanged: (value) {
+                _loginValue = value;
+              },
               decoration: InputDecoration(
-                labelText: 'أدخل رقم الهوية أو جواز السفر',
+                labelText: 'أدخل رقم البطاقة الشخصية',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.send),
@@ -66,9 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       _isLoading
                           ? null
                           : () {
-                            _validateAndNavigate(
-                              _barcodeController.text.trim(),
-                            );
+                            _validateAndNavigate(_loginValue.trim());
                           },
                 ),
               ),
@@ -82,15 +103,15 @@ class _LoginScreenState extends State<LoginScreen> {
             if (_isLoading) const CircularProgressIndicator(),
             if (!_isLoading)
               ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const BarcodeScannerScreen(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('مسح الباركود'),
+                onPressed:
+                    _isLoading
+                        ? null
+                        : () {
+                          FocusScope.of(context).unfocus();
+                          _validateAndNavigate(_loginValue.trim());
+                        },
+                icon: const Icon(Icons.login),
+                label: const Text('تسجيل الدخول'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -105,27 +126,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class BarcodeScannerScreen extends StatelessWidget {
-  const BarcodeScannerScreen({super.key});
+// class BarcodeScannerScreen extends StatelessWidget {
+//   const BarcodeScannerScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('مسح الباركود')),
-      body: MobileScanner(
-        onDetect: (capture) {
-          final List<Barcode> barcodes = capture.barcodes;
-          for (final barcode in barcodes) {
-            Navigator.of(context).pop();
-            if (context.mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const MainScreen()),
-                (Route<dynamic> route) => false,
-              );
-            }
-          }
-        },
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(title: const Text('مسح الباركود')),
+//       body: MobileScanner(
+//         onDetect: (capture) async {
+//           if (capture.barcodes.isNotEmpty) {
+//             final String scannedCode = capture.barcodes.first.rawValue ?? '';
+//             Navigator.of(context).pop();
+//             if (context.mounted) {
+//               final loginScreen =
+//                   context.findAncestorStateOfType<_LoginScreenState>();
+//               if (loginScreen != null) {
+//                 await loginScreen._validateAndNavigate(scannedCode);
+//               }
+//             }
+//           }
+//         },
+//       ),
+//     );
+//   }
+// }

@@ -13,9 +13,17 @@ class HealthPdfsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text(
           'الحالات الصحية',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         centerTitle: true,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, size: 36),
+          onPressed: () => Navigator.of(context).maybePop(),
+          color: Theme.of(context).colorScheme.onPrimary,
+          tooltip: 'رجوع',
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -48,7 +56,6 @@ class HealthPdfsScreen extends StatelessWidget {
                     color: Colors.green.shade100,
                     icon: Icons.mosque,
                   ),
-                  
                 ],
               ),
             ),
@@ -58,7 +65,8 @@ class HealthPdfsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPdfButton(BuildContext context, {
+  Widget _buildPdfButton(
+    BuildContext context, {
     required String title,
     required String assetPath,
     required Color color,
@@ -81,7 +89,10 @@ class HealthPdfsScreen extends StatelessWidget {
               Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
@@ -105,9 +116,9 @@ class HealthPdfsScreen extends StatelessWidget {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('حدث خطأ: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
     }
   }
 }

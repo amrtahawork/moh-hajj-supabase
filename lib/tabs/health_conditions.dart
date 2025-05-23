@@ -6,7 +6,8 @@ import '../screens/other_factors_screen.dart';
 import '../screens/comments_screen.dart';
 
 class HealthConditionsTab extends StatefulWidget {
-  const HealthConditionsTab({super.key});
+  final void Function(int)? onTabChange;
+  const HealthConditionsTab({super.key, this.onTabChange});
 
   @override
   State<HealthConditionsTab> createState() => _HealthConditionsTabState();
@@ -22,12 +23,29 @@ class _HealthConditionsTabState extends State<HealthConditionsTab> {
       appBar: AppBar(
         title: const Text(
           'مدخلاتي الصحية',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           textDirection: TextDirection.rtl,
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         elevation: 0,
+        leading:
+            (widget.onTabChange != null)
+                ? IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 36),
+                  onPressed: () => widget.onTabChange!(0),
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  tooltip: 'رجوع',
+                )
+                : (Navigator.of(context).canPop()
+                    ? IconButton(
+                      icon: const Icon(Icons.arrow_back, size: 36),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      tooltip: 'رجوع',
+                    )
+                    : null),
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,

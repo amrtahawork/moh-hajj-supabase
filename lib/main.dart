@@ -7,15 +7,15 @@ import 'tabs/home.dart';
 import 'tabs/my_medical_info.dart';
 import 'tabs/health_conditions.dart';
 import 'tabs/important_numbers_addresses.dart';
-import 'services/supabase_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(); // Load .env file
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   await Supabase.initialize(
-    url: 'https://lgoondtlxtobdibmplhg.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxnb29uZHRseHRvYmRpYm1wbGhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4MTMxMDksImV4cCI6MjA2MjM4OTEwOX0.2AXoLLQglITuVYTA1OQHCwA4mlvhRhGp4gboXQ5f-_g',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
   runApp(const MyApp());
 }
@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Health Pass',
+      title: 'صحة للحجاج المصريين',
       theme: ThemeData(primarySwatch: Colors.blue),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -66,9 +66,9 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _tabs = [
       Home(onTabChange: _onItemTapped),
-      const MyMedicalInfoTab(),
-      const HealthConditionsTab(),
-      const ImportantNumbersAddressesTab(),
+      MyMedicalInfoTab(onTabChange: _onItemTapped),
+      HealthConditionsTab(onTabChange: _onItemTapped),
+      ImportantNumbersAddressesTab(onTabChange: _onItemTapped),
     ];
   }
 
@@ -87,7 +87,7 @@ class _MainScreenState extends State<MainScreen> {
         preferredSize: const Size.fromHeight(40), // Compact app bar height
         child: AppBar(
           title: const Text(
-            'Health Pass',
+            ' صحة الحجاج المصريين',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,

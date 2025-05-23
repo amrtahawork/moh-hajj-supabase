@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
-import '../services/health_data_service.dart';
+import '../services/supabase_service.dart';
+import '../screens/login_screen.dart'; // For AppUser
+import '../services/supabase_medical_info_service.dart';
 
 class MyMedicalInfoTab extends StatefulWidget {
-  const MyMedicalInfoTab({super.key});
+  final void Function(int)? onTabChange;
+  const MyMedicalInfoTab({super.key, this.onTabChange});
 
   @override
   State<MyMedicalInfoTab> createState() => _MyMedicalInfoTabState();
 }
 
 class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
-  final HealthDataService _service = HealthDataService();
-  List<String> _apiConditions = [];
-  List<String> _apiMedications = [];
-  List<String> _apiAllergies = [];
-  List<String> _apiOtherFactors = [];
-  String _apiComments = '';
+  final SupabaseMedicalInfoService _medicalInfoService =
+      SupabaseMedicalInfoService();
+  MedicalInfo? _medicalInfo;
   bool _isLoading = true;
 
   // Added state for blood type
@@ -51,43 +51,86 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
   Future<void> _fetchAllMedicalInfo() async {
     setState(() => _isLoading = true);
     try {
-      // Initialize the health data service which will load data from Supabase
-      await _service.init();
-      
+      final String? nationalId = AppUser.currentUserId;
+      if (nationalId == null) {
+        setState(() {
+          _medicalInfo = null;
+          _isLoading = false;
+        });
+        return;
+      }
+      final info = await _medicalInfoService.fetchMedicalInfo(nationalId);
       setState(() {
-        // Use data directly from the service which now comes from Supabase
-        _apiConditions = _service.conditions.keys.toList();
-        _apiMedications = _service.medications;
-        // Note: If allergies is not implemented in the service, this might need adjustment
-        _apiAllergies = [];
-        _apiOtherFactors = _service.otherFactors;
-        _apiComments = _service.comments;
+        _medicalInfo = info;
         _isLoading = false;
       });
     } catch (e) {
       print('Error fetching medical info: $e');
       setState(() {
-        _apiConditions = _service.conditions.keys.toList();
-        _apiMedications = _service.medications;
-        _apiAllergies = [];
-        _apiOtherFactors = _service.otherFactors;
-        _apiComments = _service.comments;
+        _medicalInfo = null;
         _isLoading = false;
       });
     }
   }
 
- 
   Future<void> _loadBloodType() async {
-   
+    try {
+      final SupabaseService supabaseService = SupabaseService();
+      final String? nationalId = AppUser.currentUserId;
+      if (nationalId == null) return;
+      final bloodTypeData = await supabaseService.getBloodTypeFromProfile(
+        nationalId,
+      );
+      if (bloodTypeData != null) {
+        setState(() {
+          _selectedBloodType = bloodTypeData['blood_type'];
+          _selectedRhFactor = bloodTypeData['rh_factor'];
+          // Update toggle selections
+          if (_selectedBloodType != null) {
+            int bloodIndex = _bloodTypes.indexOf(_selectedBloodType!);
+            if (bloodIndex != -1) {
+              for (int i = 0; i < _bloodTypeSelection.length; i++) {
+                _bloodTypeSelection[i] = i == bloodIndex;
+              }
+            }
+          }
+          if (_selectedRhFactor != null) {
+            int rhIndex = _rhFactors.indexOf(_selectedRhFactor!);
+            if (rhIndex != -1) {
+              for (int i = 0; i < _rhFactorSelection.length; i++) {
+                _rhFactorSelection[i] = i == rhIndex;
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('Error loading blood type: $e');
+    }
   }
 
-  // Added method to save blood type (example using shared_preferences)
+  // Save blood type using SupabaseService
   Future<void> _saveBloodType() async {
-   
-    print(
-      'Saving Blood Type: $_selectedBloodType$_selectedRhFactor',
-    ); // Placeholder
+    if (_selectedBloodType == null || _selectedRhFactor == null) return;
+    try {
+      final SupabaseService supabaseService = SupabaseService();
+      final String? nationalId = AppUser.currentUserId;
+      if (nationalId == null) return;
+      final success = await supabaseService.saveBloodTypeToProfile(
+        nationalId: nationalId,
+        bloodType: _selectedBloodType!,
+        rhFactor: _selectedRhFactor!,
+      );
+      if (success) {
+        print(
+          'Blood type saved successfully: $_selectedBloodType$_selectedRhFactor',
+        );
+      } else {
+        print('Failed to save blood type');
+      }
+    } catch (e) {
+      print('Error saving blood type: $e');
+    }
   }
 
   // Copied and adapted from BloodTypeScreen
@@ -226,6 +269,13 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
     );
   }
 
+  bool _isValidUuid(String uuid) {
+    final RegExp uuidRegExp = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    );
+    return uuidRegExp.hasMatch(uuid);
+  }
+
   Color _getConditionColor(String condition) {
     for (var entry in _categoryColors.entries) {
       if (condition.contains(entry.key)) {
@@ -237,77 +287,260 @@ class _MyMedicalInfoTabState extends State<MyMedicalInfoTab> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('معلوماتي الطبية')),
+      appBar: AppBar(
+        title: const Text('معلوماتي الطبية'),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
+        centerTitle: true,
+        leading:
+            (widget.onTabChange != null)
+                ? IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 36),
+                  onPressed: () => widget.onTabChange!(0),
+                  color: theme.colorScheme.onPrimary,
+                  tooltip: 'رجوع',
+                )
+                : (Navigator.of(context).canPop()
+                    ? IconButton(
+                      icon: const Icon(Icons.arrow_back, size: 36),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      color: theme.colorScheme.onPrimary,
+                      tooltip: 'رجوع',
+                    )
+                    : null),
+      ),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Conditions
-                    Text(
-                      'الحالات الصحية:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_apiConditions.isEmpty)
-                      const Text('لا توجد حالات صحية مسجلة.'),
-                    ..._apiConditions.map((c) => ListTile(title: Text(c))),
-                    const Divider(),
-                    // Medications
-                    Text(
-                      'الأدوية:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_apiMedications.isEmpty)
-                      const Text('لا توجد أدوية مسجلة.'),
-                    ..._apiMedications.map((m) => ListTile(title: Text(m))),
-                    const Divider(),
-                    // Allergies
-                    Text(
-                      'الحساسية:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_apiAllergies.isEmpty)
-                      const Text('لا توجد حساسية مسجلة.'),
-                    ..._apiAllergies.map((a) => ListTile(title: Text(a))),
-                    const Divider(),
-                    // Other Factors
-                    Text(
-                      'عوامل أخرى:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_apiOtherFactors.isEmpty)
-                      const Text('لا توجد عوامل أخرى مسجلة.'),
-                    ..._apiOtherFactors.map((f) => ListTile(title: Text(f))),
-                    const Divider(),
-                    // Comments
-                    Text(
-                      'ملاحظات / تعليقات:',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    if (_apiComments.isEmpty)
-                      const Text('لا توجد ملاحظات أو تعليقات.'),
-                    if (_apiComments.isNotEmpty)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(_apiComments),
+                    // Blood type card
+                    Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
+                      elevation: 2,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.bloodtype,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: const Text(
+                          'فصيلة الدم',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          _selectedBloodType != null &&
+                                  _selectedRhFactor != null
+                              ? '${_selectedBloodType!}${_selectedRhFactor!}'
+                              : 'غير محددة',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: _showBloodTypeDialog,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Conditions
+                    _buildSectionCard(
+                      icon: Icons.health_and_safety,
+                      title: 'الحالات الصحية',
+                      children:
+                          _medicalInfo!.selectedConditions.isEmpty
+                              ? [const Text('لا توجد حالات صحية مسجلة.')]
+                              : [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children:
+                                      _medicalInfo!.selectedConditions
+                                          .map(
+                                            (c) => Chip(
+                                              label: Text(c),
+                                              backgroundColor:
+                                                  theme
+                                                      .colorScheme
+                                                      .secondaryContainer,
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
+                              ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Medications
+                    _buildSectionCard(
+                      icon: Icons.medication,
+                      title: 'الأدوية',
+                      children:
+                          _medicalInfo!.medications.isEmpty
+                              ? [const Text('لا توجد أدوية مسجلة.')]
+                              : [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children:
+                                      _medicalInfo!.medications
+                                          .map(
+                                            (m) => Chip(
+                                              label: Text(m),
+                                              backgroundColor:
+                                                  theme
+                                                      .colorScheme
+                                                      .secondaryContainer,
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
+                              ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Allergies
+                    _buildSectionCard(
+                      icon: Icons.warning_amber_rounded,
+                      title: 'الحساسية',
+                      children:
+                          _medicalInfo!.allergies.isEmpty
+                              ? [const Text('لا توجد حساسية مسجلة.')]
+                              : [
+                                if (_medicalInfo!.allergies['drugs_allergy'] ==
+                                    true)
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.check,
+                                      color: Colors.pink,
+                                    ),
+                                    title: const Text('حساسية الأدوية'),
+                                    subtitle:
+                                        _medicalInfo!.allergies['drugs_details']
+                                                .toString()
+                                                .isNotEmpty
+                                            ? Text(
+                                              _medicalInfo!
+                                                  .allergies['drugs_details'],
+                                            )
+                                            : null,
+                                  ),
+                                if (_medicalInfo!.allergies['food_allergy'] ==
+                                    true)
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.check,
+                                      color: Colors.pink,
+                                    ),
+                                    title: const Text('حساسية الطعام'),
+                                    subtitle:
+                                        _medicalInfo!.allergies['food_details']
+                                                .toString()
+                                                .isNotEmpty
+                                            ? Text(
+                                              _medicalInfo!
+                                                  .allergies['food_details'],
+                                            )
+                                            : null,
+                                  ),
+                                if (_medicalInfo!.allergies['other_allergy'] ==
+                                    true)
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.check,
+                                      color: Colors.pink,
+                                    ),
+                                    title: const Text('حساسيات أخرى'),
+                                    subtitle:
+                                        _medicalInfo!.allergies['other_details']
+                                                .toString()
+                                                .isNotEmpty
+                                            ? Text(
+                                              _medicalInfo!
+                                                  .allergies['other_details'],
+                                            )
+                                            : null,
+                                  ),
+                              ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Other Factors
+                    _buildSectionCard(
+                      icon: Icons.info_outline,
+                      title: 'عوامل أخرى',
+                      children:
+                          _medicalInfo!.selectedOtherFactors.isEmpty
+                              ? [const Text('لا توجد عوامل أخرى مسجلة.')]
+                              : [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children:
+                                      _medicalInfo!.selectedOtherFactors
+                                          .map(
+                                            (f) => Chip(
+                                              label: Text(f),
+                                              backgroundColor:
+                                                  theme
+                                                      .colorScheme
+                                                      .secondaryContainer,
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
+                              ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Comments
+                    _buildSectionCard(
+                      icon: Icons.comment,
+                      title: 'ملاحظات',
+                      children:
+                          _medicalInfo!.comments.isEmpty
+                              ? [const Text('لا توجد ملاحظات مسجلة.')]
+                              : [Text(_medicalInfo!.comments)],
+                    ),
                   ],
                 ),
               ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
     );
   }
 }
